@@ -1,0 +1,218 @@
+*lvim-tasks.txt*    Task runner — jobs with live terminal output, panel, history
+
+==============================================================================
+CONTENTS                                              *lvim-tasks*
+
+  1. Introduction ........................... |lvim-tasks-intro|
+  2. Setup .................................. |lvim-tasks-setup|
+  3. Command ................................ |lvim-tasks-command|
+  4. Panel keys ............................. |lvim-tasks-panel|
+  5. API .................................... |lvim-tasks-api|
+  6. Templates .............................. |lvim-tasks-templates|
+  7. Problem matchers ....................... |lvim-tasks-matchers|
+  8. VSCode tasks ........................... |lvim-tasks-vscode|
+  9. History ................................ |lvim-tasks-history|
+ 10. Events ................................. |lvim-tasks-events|
+ 11. Highlights ............................. |lvim-tasks-highlights|
+
+==============================================================================
+1. INTRODUCTION                                       *lvim-tasks-intro*
+
+lvim-tasks runs commands as jobs, each streaming into its OWN terminal
+buffer (full ANSI colour; the scrollback is the output history), and shows
+them in a list panel with live status. A task's lifecycle is
+
+  pending → running → success | failed | canceled
+
+Every transition fires the |lvim-tasks-events| autocmd and the spec's hooks.
+On exit, a task with a `matcher` has its output parsed with 'errorformat'
+and the resulting locations pushed to the quickfix list (styled by
+lvim-qf-loc when installed). Requires Neovim >= 0.11.
+
+lvim-tasks is the execution backend of lvim-build: build DETECTS actions,
+tasks RUNS them.
+
+==============================================================================
+2. SETUP                                              *lvim-tasks-setup*
+>lua
+  require("lvim-tasks").setup({
+      layout = "bottom",             -- panel layout: float|area|bottom
+      title = "Tasks",
+      title_pos = "left",            -- left|center|right
+      preview = true,                -- output preview beside the list
+      max_history = 30,              -- live registry cap
+      dispose_succeeded_after = 300, -- s; nil = keep succeeded tasks
+      persist_history = false,       -- sqlite run history (needs sqlite.lua)
+      qf = true,                     -- matcher results -> quickfix
+      hud_chip = true,               -- "N tasks" statusline chip while running
+      vscode_tasks = true,           -- ingest .vscode/tasks.json templates
+      spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
+      icons = {
+          tasks = "󰑮",
+          pending = "󰔟",
+          running = "󰐊",
+          success = "󰄬",
+          failed = "󰅚",
+          canceled = "󰜺",
+      },
+      colors = {                     -- palette keys or "#rrggbb"
+          pending = "blue",
+          running = "yellow",
+          success = "green",
+          failed = "red",
+          canceled = "comment",
+      },
+  })
+<
+==============================================================================
+3. COMMAND                                            *lvim-tasks-command*
+
+                                                      *:LvimTasks*
+:LvimTasks [{sub}] [{layout}]
+
+  A {layout} token (`float` | `area` | `bottom`) is recognised anywhere in
+  the arguments and is sticky for the session. Subcommands:
+
+  (none)          open the task panel
+  toggle          toggle the panel
+  run             template chooser (condition-filtered, grouped labels)
+  run {template}  run a template by name (completes)
+  redo            re-run the last spec run in this project
+  redo-failed     re-run the most recent FAILED task (registry, then history)
+  stop [{id}]     stop a running task (default: the most recent one)
+  history         past runs (persist_history) — <CR> re-runs a row
+  clear           dispose every non-running task
+
+==============================================================================
+4. PANEL KEYS                                         *lvim-tasks-panel*
+
+  j / k           move between task rows (the preview follows)
+  <CR>            open the OUTPUT — focus the task's terminal buffer
+  r               restart the task (fresh output buffer)
+  x               stop the task (SIGTERM → SIGKILL escalation)
+  d               dispose the task (drop the row + its output)
+  e               edit the command, run it as a NEW task
+  u / f / s / a   filter: Running / Failed / Success / All (live counts)
+  n               new task (type a command)
+  c               clear done
+  <C-j> / <C-k>   move between sectors (filter bar · list · footer)
+  <C-l> / <C-h>   move into / out of the output preview (<Tab> toggles it)
+  q / <Esc>       close
+
+The border counter shows running/total. A running row shows the spinner and,
+when the history knows the template's average duration, a soft `~ETA`.
+
+==============================================================================
+5. API                                                *lvim-tasks-api*
+
+run({spec})                                           *lvim-tasks.run()*
+  Create + register + start a task. Returns the live task object. The spec:
+>lua
+  {
+      name = "build docs",          -- display name (defaults to the cmd)
+      cmd = { "make", "docs" },     -- argv list, or a string via the shell
+      cwd = "/path",                -- default: the current cwd
+      env = { FOO = "1" },          -- extra environment
+      matcher = "gcc",              -- builtin name or literal errorformat
+      group = "Build",              -- display group
+      template = "make docs",       -- history grouping key (set by templates)
+      hooks = {
+          on_start = function(task) end,
+          on_output = function(task, lines) end,
+          on_exit = function(task) end,
+      },
+  }
+<
+run_template({name}, {ctx}?)                          *lvim-tasks.run_template()*
+  Build a registered template's spec for the context and run it.
+
+register({template})                                  *lvim-tasks.register()*
+  Register (or replace) a template — see |lvim-tasks-templates|.
+
+list()  get({id})  stop({id}?)  redo()  redo_failed()
+open({layout}?)  toggle({layout}?)
+
+status.get()                                          *lvim-tasks-status*
+  `require("lvim-tasks.status").get()` returns
+  `{ running = n, failed = n, success = n }` — the stable seam for a
+  statusline component.
+
+Task object fields: `id`, `spec`, `status`, `exit_code`, `bufnr` (the
+terminal output buffer), `job_id`, `started_at`/`ended_at` (monotonic ms),
+`started_epoch` (wall clock), and `task:duration_ms()`.
+
+==============================================================================
+6. TEMPLATES                                          *lvim-tasks-templates*
+
+A template is a named generator: >lua
+
+  {
+      name = "cargo test",
+      desc = "run the test suite",          -- optional
+      group = "Test",                       -- optional
+      condition = function(ctx)             -- optional gate (default: always)
+          return vim.fn.filereadable(ctx.cwd .. "/Cargo.toml") == 1
+      end,
+      builder = function(ctx)               -- ctx = { file, ft, cwd }
+          return { cmd = { "cargo", "test" }, cwd = ctx.cwd, matcher = "rust" }
+      end,
+  }
+<
+`:LvimTasks run` lists the templates whose `condition(ctx)` passes.
+lvim-build registers its detected actions through this seam; the vscode
+parser registers a project's tasks.json entries.
+
+==============================================================================
+7. PROBLEM MATCHERS                                   *lvim-tasks-matchers*
+
+A task's `matcher` is a BUILTIN name — `gcc`, `rust`, `go`, `typescript`,
+`python`, `lua`, `generic` — or a literal 'errorformat' string. On exit the
+output buffer's lines are parsed and entries that resolved to a real
+location are pushed to the quickfix list via |setqflist()| with the title
+"lvim-tasks: <name>". Disable with `qf = false`.
+
+==============================================================================
+8. VSCODE TASKS                                       *lvim-tasks-vscode*
+
+With `vscode_tasks = true`, the workspace's `.vscode/tasks.json` (JSONC —
+comments and trailing commas are tolerated) is scanned lazily and re-scanned
+when its mtime changes. Supported subset: the `shell` and `process` task
+types, `command` + `args`, `options.cwd` / `options.env`,
+`${workspaceFolder}`-style variables, the task `group` (build/test), and the
+named problem matchers `$gcc`, `$rustc`, `$go`, `$tsc`, `$eslint-…`,
+`$msCompile`. Each becomes a template named `vscode: <label>`.
+
+==============================================================================
+9. HISTORY                                            *lvim-tasks-history*
+
+With `persist_history = true` (and sqlite.lua installed) every finished run
+inserts ONE row into the plugin's own database
+`stdpath("data")/lvim-tasks/lvim-tasks.db`: template, command, cwd, exit
+code, duration, started-at. It powers `:LvimTasks history` (re-run a past
+row), `:LvimTasks redo-failed` across restarts, and the panel's soft ETA
+(the template's average successful duration). Live execution never touches
+the db on the hot path.
+
+==============================================================================
+10. EVENTS                                            *lvim-tasks-events*
+
+                                                      *LvimTasksChanged*
+Every status transition (and a dispose) fires: >lua
+
+  vim.api.nvim_create_autocmd("User", {
+      pattern = "LvimTasksChanged",
+      callback = function(ev)
+          -- ev.data = { id = <task id>, status = "running"|"success"|... }
+      end,
+  })
+<
+==============================================================================
+11. HIGHLIGHTS                                        *lvim-tasks-highlights*
+
+Self-themed from the lvim-utils palette; accents from `colors`:
+
+  LvimTasksPendingBadge / Running / Success / Failed / Canceled
+  LvimTasksPendingName  / Running / Success / Failed / Canceled
+  LvimTasksText  LvimTasksDim  LvimTasksGroup  LvimTasksEta  LvimTasksEmpty
+
+vim:tw=78:ts=8:noet:ft=help:norl:

@@ -19,6 +19,7 @@ local history = require("lvim-tasks.history")
 local ui = require("lvim-ui")
 local ui_filters = require("lvim-ui.filters")
 local uipreview = require("lvim-ui.preview")
+local surface = require("lvim-ui.surface")
 
 local M = {}
 
@@ -35,11 +36,18 @@ local NS = api.nvim_create_namespace("lvim-tasks-preview-empty")
 ---@field preview_pan table?   the preview panel handle (captured in the provider keys hook)
 ---@field spin_i integer       current spinner frame index
 ---@field timer uv.uv_timer_t? the spinner timer (runs only while open AND anything runs)
+---@field dock_key string?     the dock ENTRY KEY returned by `dock.open` (passed back to dock.closed)
+---@field parking boolean      true while the DOCK is parking us — suppresses the self-close notification
 local state = {
     registry = {},
     filter = "all",
     spin_i = 1,
+    parking = false,
 }
+
+-- The shared dock-stack manager. Optional: without it (an older lvim-utils) the panel still opens — it
+-- just does so standalone, outside the stack.
+local ok_dock, dock = pcall(require, "lvim-utils.dock")
 
 ---@param msg string
 ---@param level integer?
@@ -235,32 +243,57 @@ local function bind_output_keys(buf)
         return
     end
     vim.b[buf].lvim_tasks_nav = true
+    --- Bind one chassis key (a single lhs or a list) on the output buffer.
+    ---@param lhs string|string[]|nil
+    ---@param fn fun()
+    ---@param desc string
     local function map(lhs, fn, desc)
-        vim.keymap.set("n", lhs, fn, { buffer = buf, nowait = true, silent = true, desc = desc })
+        for _, k in ipairs(type(lhs) == "table" and lhs or { lhs }) do
+            if type(k) == "string" and k ~= "" then
+                vim.keymap.set("n", k, fn, { buffer = buf, nowait = true, silent = true, desc = desc })
+            end
+        end
     end
     local function frame()
         local pan = state.preview_pan
         return pan and pan.frame or nil
     end
-    map("<C-h>", function()
+    --- The chassis nav key `id` as the user has it configured (never a hardcoded copy: a remap in
+    --- lvim-ui must reach the output buffer too, or the key that walked IN would not walk back OUT).
+    ---@param id string
+    ---@return string|string[]|nil
+    local function key(id)
+        return surface.key(id)
+    end
+
+    -- panel_toggle (<Tab>) is the key that FOCUSED this buffer — so it is the one the user reaches
+    -- for to leave it. It was missing here, which stranded them in the output: the toggle is bound by
+    -- the chassis on its OWN scratch buffers, and a terminal buffer carries none of them.
+    map(key("panel_toggle"), function()
+        local f = frame()
+        if f and f.panel_toggle then
+            f.panel_toggle()
+        end
+    end, "lvim-tasks: back to the task list")
+    map(key("panel_prev"), function()
         local f = frame()
         if f then
             f.panel(-1)
         end
     end, "lvim-tasks: back to the task list")
-    map("<C-l>", function()
+    map(key("panel_next"), function()
         local f = frame()
         if f then
             f.panel(1)
         end
     end, "lvim-tasks: next panel")
-    map("<C-j>", function()
+    map(key("sector_next"), function()
         local f = frame()
         if f then
             f.sector(1)
         end
     end, "lvim-tasks: next sector")
-    map("<C-k>", function()
+    map(key("sector_prev"), function()
         local f = frame()
         if f then
             f.sector(-1)
@@ -412,13 +445,40 @@ end
 
 -- ── per-row action keys ──────────────────────────────────────────────────────
 
---- Wire the row action keys on the panel buffer: r restart, x stop, d dispose, e edit-and-rerun.
---- Every key dispatches on the focused row's task; mutations repaint through M.refresh().
+--- Hand the focused task's OUTPUT to lvim-term as an adopted terminal tab. The preview beside the list is
+--- a viewer — you read it; a terminal TAB is a real terminal — you TYPE into it, which is the only way to
+--- drive a program that wants input (a watch-mode test runner waiting for a keypress, a REPL, a prompt).
+--- lvim-term only views the buffer: the task keeps its job, and closing the tab detaches it.
+---@param task LvimTask?
+local function open_in_term(task)
+    if not (task and task.bufnr and api.nvim_buf_is_valid(task.bufnr)) then
+        notify("no output to open (the task has produced none yet)", vim.log.levels.WARN)
+        return
+    end
+    local ok, term = pcall(require, "lvim-term")
+    if not ok or type(term.adopt) ~= "function" then
+        notify("lvim-term is not installed (it provides the interactive terminal)", vim.log.levels.WARN)
+        return
+    end
+    term.adopt({
+        bufnr = task.bufnr,
+        job_id = task.job_id,
+        name = task.spec.name,
+        cwd = task.spec.cwd,
+    })
+end
+
+--- Wire the row action keys on the panel buffer: r restart, x stop, d dispose, e edit-and-rerun,
+--- t open-the-output-as-a-terminal. Every key dispatches on the focused row's task; mutations repaint
+--- through M.refresh().
 ---@param buf integer
 local function wire_keys(buf)
     local function key(lhs, fn, desc)
         vim.keymap.set("n", lhs, fn, { buffer = buf, nowait = true, silent = true, desc = desc })
     end
+    key("t", function()
+        open_in_term(cur_task())
+    end, "Open the output as an interactive terminal (lvim-term)")
     key("r", function()
         local task = cur_task()
         if task then
@@ -477,6 +537,13 @@ end
 local function build_footer()
     return {
         {
+            key = "t",
+            label = "terminal",
+            run = function()
+                open_in_term(cur_task())
+            end,
+        },
+        {
             key = "n",
             label = "new",
             run = function()
@@ -512,12 +579,16 @@ end
 
 -- ── open / close ─────────────────────────────────────────────────────────────
 
---- Open the task panel.
+--- Build + show the frame. The panel's STATE lives in the task registry, never in the frame, so the
+--- frame is fully reconstructible — which is what makes the dock's park/restore trivial and lossless:
+--- `hide` just tears the window down, `show` rebuilds it from the registry.
 ---@param layout string?  per-open layout override ("float" | "area" | "bottom"; session-sticky)
-function M.open(layout)
+local function open_frame(layout)
     if M.is_open() then
+        state.parking = true -- a rebuild, not a user close: do not notify the dock
         state.handle.close()
         state.handle = nil
+        state.parking = false
     end
     if layout then
         state.layout = layout -- a per-command override is sticky for the session
@@ -557,13 +628,97 @@ function M.open(layout)
             state.tabs = nil
             state.preview_pan = nil
             state.registry = {}
+            -- A close the USER drove (q / Esc) must tell the dock, so it can reveal the LIFO-next parked
+            -- consumer. A PARK (dock-driven hide) or an internal rebuild must not — hence the guard.
+            if ok_dock and state.dock_key and not state.parking then
+                local key = state.dock_key
+                state.dock_key = nil
+                pcall(dock.closed, key)
+            end
         end,
     })
     sync_spinner()
 end
 
+--- This panel as a dock CONSUMER for `layout` — the contract the shared stack manager drives
+--- (lvim-utils.dock). Registering is what lets the global descend key (`<C-j>`) reach the panel from an
+--- editor window at all: `dock.descend()` only walks REGISTERED consumers. It also makes the panel share
+--- the one-visible-per-layout invariant with the terminal / shell / pickers, instead of overlapping them.
+---@param layout string
+---@return table
+local function consumer(layout)
+    return {
+        id = "lvim-tasks",
+        name = config.title,
+        icon = config.icons.tasks,
+        layout = layout,
+        show = function()
+            open_frame(layout)
+        end,
+        -- PARK: drop the window, keep the state. Nothing is lost — the rows come from the task registry
+        -- and each task's output lives in its own terminal buffer, both of which outlive the frame.
+        hide = function()
+            if M.is_open() then
+                state.parking = true
+                state.handle.close()
+                state.handle = nil
+                state.parking = false
+            end
+            stop_spinner()
+        end,
+        is_alive = function()
+            return true -- the registry IS the state; a parked panel can always be rebuilt
+        end,
+        close = function()
+            if M.is_open() then
+                state.parking = true
+                state.handle.close()
+                state.handle = nil
+                state.parking = false
+            end
+            stop_spinner()
+        end,
+        focus = function()
+            local win = state.handle and state.handle.win and state.handle.win()
+            if win and api.nvim_win_is_valid(win) then
+                api.nvim_set_current_win(win)
+            end
+        end,
+        -- The global descend lands on the frame's HEADER (its first sector), mirroring the <C-k> escape-up.
+        descend = function()
+            if state.handle and state.handle.enter then
+                state.handle.enter()
+            end
+        end,
+        is_current = function()
+            local win = state.handle and state.handle.win and state.handle.win()
+            return win ~= nil and win == api.nvim_get_current_win()
+        end,
+    }
+end
+
+--- Open the task panel.
+---@param layout string?  per-open layout override ("float" | "area" | "bottom"; session-sticky)
+function M.open(layout)
+    local target = layout or state.layout or config.layout
+    if not ok_dock then
+        open_frame(layout) -- no dock manager: standalone, geometry still central
+        return
+    end
+    -- Through the dock: opening in a layout that already holds a terminal / shell / picker PARKS that
+    -- occupant rather than overlapping it, and our `show` builds the frame.
+    state.dock_key = dock.open(consumer(target))
+end
+
 --- Close the panel (a no-op when it is not open).
 function M.close()
+    if ok_dock and state.dock_key then
+        local key = state.dock_key
+        state.dock_key = nil
+        pcall(dock.close, key)
+        stop_spinner()
+        return
+    end
     if M.is_open() then
         state.handle.close()
     end

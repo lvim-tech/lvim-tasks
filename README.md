@@ -16,9 +16,11 @@ the execution backend of **lvim-build** and a generic "run this and show me" API
   status **filter bar** with live counts; the border counter shows running/total. The focused
   task's **output** — its live terminal buffer — fills the preview panel beside the list.
 - **Problem matchers** — a task with a `matcher` (`gcc`, `rust`, `go`, `typescript`, `python`,
-  `lua`, `generic`, or a literal `errorformat`) has its output parsed on exit and pushed to the
-  **quickfix list** (the native `setqflist` — lvim-qf-loc styles it when installed), so compile
-  errors are clickable.
+  `pytest`, `lua`, `generic`, or a literal `errorformat`) has its output parsed on exit and pushed
+  to the **quickfix list** (the native `setqflist` — lvim-qf-loc styles it when installed), so
+  compile errors are clickable. Relative paths in the output are resolved against the TASK's `cwd`
+  (via the errorformat directory stack), not the editor's — so a task run in a project root lands
+  on the right files no matter where Neovim was started.
 - **Templates** — named generators (`condition(ctx)` gates them, `builder(ctx)` produces the
   spec). Registered by you, by lvim-build's detectors, and from `.vscode/tasks.json` (the
   `shell`/`process` types, `${workspaceFolder}` expansion, the `$gcc`-style matcher names).
@@ -86,6 +88,7 @@ require("lvim-tasks").setup({})
 |---|---|
 | `j` / `k` | move between task rows (the preview follows) |
 | `<CR>` | open the OUTPUT — focus the preview on the task's terminal buffer |
+| `t` | open the output as an **interactive terminal** (lvim-term) — type into the running program |
 | `r` | restart the task (fresh output buffer) |
 | `x` | stop the task (SIGTERM → SIGKILL escalation) |
 | `d` | dispose the task (drop the row + its output) |
@@ -93,7 +96,7 @@ require("lvim-tasks").setup({})
 | `u` / `f` / `s` / `a` | filter: Running / Failed / Success / All (live counts) |
 | `n` | new task (type a command) |
 | `c` | clear done (dispose every non-running task) |
-| `<C-j>` / `<C-k>` | move between sectors (filter bar · list · footer) |
+| `<C-j>` / `<C-k>` | move between sectors (filter bar · list · footer); `<C-k>` at the top leaves the panel |
 | `<C-l>` / `<C-h>`, `<Tab>` | move into / out of the output preview |
 | `q` / `<Esc>` | close |
 

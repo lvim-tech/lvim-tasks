@@ -25,6 +25,11 @@ them in a list panel with live status. A task's lifecycle is
   pending → running → success | failed | canceled
 
 Every transition fires the |lvim-tasks-events| autocmd and the spec's hooks.
+Built-in matchers: gcc, rust, go, typescript, python (tracebacks), pytest (its
+`file:line: msg` failure footers — a traceback matcher finds nothing in a pytest
+run), lua, generic. Relative paths are resolved against the TASK's cwd (the
+errorformat directory stack), not the editor's.
+
 On exit, a task with a `matcher` has its output parsed with 'errorformat'
 and the resulting locations pushed to the quickfix list (styled by
 lvim-qf-loc when installed). Requires Neovim >= 0.11.

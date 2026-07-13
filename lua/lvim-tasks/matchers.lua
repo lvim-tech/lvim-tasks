@@ -25,6 +25,10 @@ local BUILTIN = {
     typescript = [[%f(%l\,%c): %*[^:]: %m]],
     -- python traceback: `  File "file", line N, in fn` (+ plain SyntaxError locations)
     python = [[%*\sFile "%f"\, line %l\, in %m,%*\sFile "%f"\, line %l]],
+    -- pytest: it does NOT print a traceback for a failing assert — it prints its own failure
+    -- footer `tests/test_x.py:2: AssertionError` (and a traceback only for collection/import
+    -- errors), so the `python` matcher finds nothing in a pytest run. Both forms here.
+    pytest = [[%f:%l: %m,%*\sFile "%f"\, line %l\, in %m,%*\sFile "%f"\, line %l]],
     -- lua / luajit runtime + compile errors: `lua: file:line: message` (any leading runner name)
     lua = [[%*[^:]: %f:%l: %m,%f:%l: %m]],
     -- eslint/generic `file:line:col`
@@ -63,6 +67,15 @@ function M.apply(task)
     end
     if #lines == 0 then
         return
+    end
+    -- A task runs in ITS OWN cwd, which is usually NOT Neovim's — so the relative `%f` paths a
+    -- compiler/test runner prints (`tests/test_x.py:2: …`) would be resolved against the editor's
+    -- cwd and point at files that do not exist. Vim's own mechanism for this is the errorformat
+    -- DIRECTORY STACK: `%D` pushes a directory that subsequent relative names resolve against. So
+    -- the parse is fed one synthetic "Entering directory" line, exactly as `make -w` emits.
+    if task.spec.cwd and task.spec.cwd ~= "" then
+        efm = [[%DEntering directory '%f',]] .. efm
+        table.insert(lines, 1, ("Entering directory '%s'"):format(task.spec.cwd))
     end
     local parsed = fn.getqflist({ efm = efm, lines = lines })
     local items = (type(parsed) == "table" and parsed.items) or {}

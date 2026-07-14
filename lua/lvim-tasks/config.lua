@@ -18,7 +18,22 @@
 ---@field vscode_tasks    boolean  Register templates from a project's .vscode/tasks.json
 ---@field spinner         string[]  Spinner frames for a running task's status icon
 ---@field icons           table    Status glyphs (Nerd Font single-width)
+---@field keys            LvimTasksKeys  The panel's keymaps (row actions, footer chips, the cheatsheet)
 ---@field colors          table<string, string>  Status accents (lvim-utils palette keys or "#rrggbb")
+
+---@class LvimTasksKeys
+---@field help       string  Open the keymap cheatsheet (the set-wide `g?` chord)
+---@field terminal   string  Open the focused task's output as an interactive terminal (lvim-term)
+---@field restart    string  Restart the focused task
+---@field stop       string  Stop the focused task (SIGTERM → SIGKILL)
+---@field dispose    string  Dispose the focused task (drop its row + output)
+---@field edit       string  Edit the focused task's command and run it as a new task
+---@field new        string  Footer: run a new command
+---@field filter_running string  Filter bar: show only running tasks
+---@field filter_failed  string  Filter bar: show only failed tasks
+---@field filter_success string  Filter bar: show only succeeded tasks
+---@field filter_all     string  Filter bar: show every task
+---@field clear_done string  Footer: drop every finished task row
 
 ---@type LvimTasksConfig
 return {
@@ -56,6 +71,24 @@ return {
         success = "󰄬", -- exited 0
         failed = "󰅚", -- exited non-zero
         canceled = "󰜺", -- stopped by the user
+    },
+    -- The panel's LIVE keys — the row actions, the footer chips and the cheatsheet chord. The `g?` help
+    -- window is built from THIS table, so a rebind shows up in it.
+    keys = {
+        help = "g?", -- the set-wide cheatsheet chord (the panel owns the `g` prefix — see lvim-ui)
+        terminal = "t",
+        restart = "r",
+        stop = "x",
+        dispose = "d",
+        edit = "e",
+        new = "n",
+        clear_done = "c",
+        -- The status FILTER bar. `u` for Running: `r` is the row RESTART key, and the bar hotkeys are
+        -- re-mapped over the row keys on every header rebuild, so the two must not share a letter.
+        filter_running = "u",
+        filter_failed = "f",
+        filter_success = "s",
+        filter_all = "a",
     },
     -- Status accents: lvim-utils palette keys (track the live theme) or literal "#rrggbb".
     colors = {

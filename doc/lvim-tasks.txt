@@ -60,6 +60,20 @@ tasks RUNS them.
           failed = "󰅚",
           canceled = "󰜺",
       },
+      keys = {                       -- the panel's LIVE keys (the g? help is built
+          help = "g?",               -- from this table, so a rebind shows in it)
+          terminal = "t",
+          restart = "r",
+          stop = "x",
+          dispose = "d",
+          edit = "e",
+          new = "n",
+          clear_done = "c",
+          filter_running = "u",      -- `u`: `r` is the row RESTART key
+          filter_failed = "f",
+          filter_success = "s",
+          filter_all = "a",
+      },
       colors = {                     -- palette keys or "#rrggbb"
           pending = "blue",
           running = "yellow",
@@ -100,6 +114,7 @@ tasks RUNS them.
   u / f / s / a   filter: Running / Failed / Success / All (live counts)
   n               new task (type a command)
   c               clear done
+  g?              the keymap CHEATSHEET (also a `help` chip on the footer)
   <C-j> / <C-k>   move between sectors (filter bar · list · footer)
   <C-l> / <C-h>   move into / out of the output preview (<Tab> toggles it)
   q / <Esc>       close

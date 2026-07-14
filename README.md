@@ -96,6 +96,7 @@ require("lvim-tasks").setup({})
 | `u` / `f` / `s` / `a` | filter: Running / Failed / Success / All (live counts) |
 | `n` | new task (type a command) |
 | `c` | clear done (dispose every non-running task) |
+| `g?` | the keymap **cheatsheet** (also a `help` chip on the footer bar) |
 | `<C-j>` / `<C-k>` | move between sectors (filter bar · list · footer); `<C-k>` at the top leaves the panel |
 | `<C-l>` / `<C-h>`, `<Tab>` | move into / out of the output preview |
 | `q` / `<Esc>` | close |
@@ -182,6 +183,23 @@ require("lvim-tasks").setup({
         success = "󰄬", -- exited 0
         failed = "󰅚", -- exited non-zero
         canceled = "󰜺", -- stopped by the user
+    },
+    -- The panel's LIVE keys — the row actions, the footer chips, the filter bar and the cheatsheet
+    -- chord. The `g?` help window is built from THIS table, so a rebind shows up in it.
+    keys = {
+        help = "g?", -- the keymap cheatsheet
+        terminal = "t",
+        restart = "r",
+        stop = "x",
+        dispose = "d",
+        edit = "e",
+        new = "n",
+        clear_done = "c",
+        -- The status FILTER bar (`u` for Running: `r` is the row RESTART key).
+        filter_running = "u",
+        filter_failed = "f",
+        filter_success = "s",
+        filter_all = "a",
     },
     -- Status accents: lvim-utils palette keys (track the live theme) or literal "#rrggbb".
     colors = {

@@ -172,11 +172,12 @@ end
 --- every header rebuild, so the two must not share a letter.)
 ---@return table  a `type="bar"` row
 local function filter_bar()
+    local k = config.keys
     local buttons = {
-        { id = "running", label = "Running", key = "u" },
-        { id = "failed", label = "Failed", key = "f" },
-        { id = "success", label = "Success", key = "s" },
-        { id = "all", label = "All", key = "a" },
+        { id = "running", label = "Running", key = k.filter_running },
+        { id = "failed", label = "Failed", key = k.filter_failed },
+        { id = "success", label = "Success", key = k.filter_success },
+        { id = "all", label = "All", key = k.filter_all },
     }
     local fb = ui_filters.bar({ { id = "status", active = state.filter, buttons = buttons } }, {
         count = function(_, b)
@@ -473,27 +474,28 @@ end
 --- through M.refresh().
 ---@param buf integer
 local function wire_keys(buf)
+    local k = config.keys
     local function key(lhs, fn, desc)
         vim.keymap.set("n", lhs, fn, { buffer = buf, nowait = true, silent = true, desc = desc })
     end
-    key("t", function()
+    key(k.terminal, function()
         open_in_term(cur_task())
     end, "Open the output as an interactive terminal (lvim-term)")
-    key("r", function()
+    key(k.restart, function()
         local task = cur_task()
         if task then
             runner.restart(task, require("lvim-tasks").on_task_exit)
             M.refresh()
         end
     end, "Restart task")
-    key("x", function()
+    key(k.stop, function()
         local task = cur_task()
         if task and task:is_running() then
             runner.stop(task)
             M.refresh()
         end
     end, "Stop task (SIGTERM → SIGKILL)")
-    key("d", function()
+    key(k.dispose, function()
         local task = cur_task()
         if task then
             if task:is_running() then
@@ -504,7 +506,7 @@ local function wire_keys(buf)
             M.refresh()
         end
     end, "Dispose task (drop row + output)")
-    key("e", function()
+    key(k.edit, function()
         local task = cur_task()
         if not task then
             return
@@ -531,20 +533,58 @@ local function wire_keys(buf)
     end, "Edit the command and run it as a new task")
 end
 
+-- ── the help window (the canonical cheatsheet) ───────────────────────────────
+
+-- Key id → description, in display order. The keys come from the LIVE `config.keys` (an unset key drops
+-- its row), so a rebind is reflected in the cheatsheet.
+---@type { [1]: string, [2]: string }[]
+local HELP = {
+    { "restart", "restart the task" },
+    { "stop", "stop the task (SIGTERM → SIGKILL)" },
+    { "dispose", "dispose the task (drop row + output)" },
+    { "edit", "edit the command and rerun it" },
+    { "terminal", "open the output as an interactive terminal" },
+    { "new", "run a new command" },
+    { "clear_done", "drop every finished task" },
+    { "filter_running", "filter: running only" },
+    { "filter_failed", "filter: failed only" },
+    { "filter_success", "filter: succeeded only" },
+    { "filter_all", "filter: every task" },
+    { "help", "this help" },
+}
+
+--- The keymap cheatsheet — the shared `lvim-ui.help` component owns the rows, the striping, the colours and
+--- the window; this only supplies the plugin's LIVE keys.
+local function show_help()
+    local items = {}
+    for _, e in ipairs(HELP) do
+        local lhs = config.keys[e[1]]
+        if lhs and lhs ~= "" then
+            items[#items + 1] = { lhs, e[2] }
+        end
+    end
+    ui.help({
+        title = config.title .. " keymaps",
+        items = items,
+        close_keys = { "q", "<Esc>", config.keys.help },
+    })
+end
+
 -- ── footer chips ─────────────────────────────────────────────────────────────
 
 ---@return table[]  footer button specs (the ui.tabs per-tab `footer` shape)
 local function build_footer()
+    local k = config.keys
     return {
         {
-            key = "t",
+            key = k.terminal,
             label = "terminal",
             run = function()
                 open_in_term(cur_task())
             end,
         },
         {
-            key = "n",
+            key = k.new,
             label = "new",
             run = function()
                 ui.input({
@@ -558,7 +598,7 @@ local function build_footer()
             end,
         },
         {
-            key = "c",
+            key = k.clear_done,
             label = "clear done",
             run = function()
                 registry.clear_done()
@@ -566,6 +606,17 @@ local function build_footer()
             end,
         },
         { type = "separator", text = "●", style = { padding = { 1, 1 }, hl = "LvimUiFooterSep" } },
+        {
+            -- The row keys are not discoverable from the list, so the bar has to say where they are written
+            -- down. A DISPLAY chip: the real `g?` is a frame-wide keymap (see open_frame), which is what makes
+            -- the chassis own the `g` prefix.
+            key = k.help,
+            label = "help",
+            no_hotkey = true,
+            run = function()
+                show_help()
+            end,
+        },
         {
             key = "q/Esc",
             label = "close",
@@ -614,6 +665,10 @@ local function open_frame(layout)
         pad = 0, -- the badges carry their own gutter; the list sits flush
         cursorline_hl = "LvimUiCursorLine",
         preview = build_preview(),
+        -- The cheatsheet is a FRAME-WIDE keymap, not an `on_open` buffer map: only keys the chassis binds
+        -- itself land in its `used` set, which is what makes it OWN the `g` chord prefix (so a `g?` typed at
+        -- human speed cannot fall through to the builtin `g` once `timeoutlen` expires).
+        keymaps = { { key = config.keys.help, run = show_help } },
         on_item_change = function()
             if state.preview_pan then
                 render_preview(state.preview_pan)

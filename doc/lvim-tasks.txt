@@ -69,10 +69,6 @@ tasks RUNS them.
           edit = "e",
           new = "n",
           clear_done = "c",
-          filter_running = "u",      -- `u`: `r` is the row RESTART key
-          filter_failed = "f",
-          filter_success = "s",
-          filter_all = "a",
       },
       colors = {                     -- palette keys or "#rrggbb"
           pending = "blue",

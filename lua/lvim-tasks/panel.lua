@@ -174,10 +174,10 @@ end
 local function filter_bar()
     local k = config.keys
     local buttons = {
-        { id = "running", label = "Running", key = k.filter_running },
-        { id = "failed", label = "Failed", key = k.filter_failed },
-        { id = "success", label = "Success", key = k.filter_success },
-        { id = "all", label = "All", key = k.filter_all },
+        { id = "running", label = "Running" },
+        { id = "failed", label = "Failed" },
+        { id = "success", label = "Success" },
+        { id = "all", label = "All" },
     }
     local fb = ui_filters.bar({ { id = "status", active = state.filter, buttons = buttons } }, {
         count = function(_, b)
@@ -546,10 +546,7 @@ local HELP = {
     { "terminal", "open the output as an interactive terminal" },
     { "new", "run a new command" },
     { "clear_done", "drop every finished task" },
-    { "filter_running", "filter: running only" },
-    { "filter_failed", "filter: failed only" },
-    { "filter_success", "filter: succeeded only" },
-    { "filter_all", "filter: every task" },
+    -- The status filter bar claims no keys: a filter is fired with <CR> on its button (or a click).
     { "help", "this help" },
 }
 

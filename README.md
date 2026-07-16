@@ -196,10 +196,6 @@ require("lvim-tasks").setup({
         new = "n",
         clear_done = "c",
         -- The status FILTER bar (`u` for Running: `r` is the row RESTART key).
-        filter_running = "u",
-        filter_failed = "f",
-        filter_success = "s",
-        filter_all = "a",
     },
     -- Status accents: lvim-utils palette keys (track the live theme) or literal "#rrggbb".
     colors = {

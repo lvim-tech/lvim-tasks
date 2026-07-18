@@ -383,7 +383,7 @@ function M.show_output(task)
     while #lines > 0 and lines[#lines] == "" do
         lines[#lines] = nil
     end
-    ui.info(lines, { title = " " .. (task.spec.name or "task"), hide_cursor = true })
+    ui.info(lines, { title = task.spec.name or "task", hide_cursor = true })
 end
 
 -- ── the spinner ──────────────────────────────────────────────────────────────
@@ -513,7 +513,7 @@ local function wire_keys(buf)
         end
         local cmd = task.spec.cmd
         ui.input({
-            title = " Edit & rerun",
+            title = "Edit & rerun",
             default = type(cmd) == "table" and table.concat(cmd, " ") or tostring(cmd or ""),
             callback = function(confirmed, value)
                 if confirmed ~= true or vim.trim(value or "") == "" then
@@ -585,7 +585,7 @@ local function build_footer()
             label = "new",
             run = function()
                 ui.input({
-                    title = " Run command",
+                    title = "Run command",
                     callback = function(confirmed, value)
                         if confirmed == true and vim.trim(value or "") ~= "" then
                             require("lvim-tasks").run({ name = value, cmd = value })

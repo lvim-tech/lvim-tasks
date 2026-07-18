@@ -185,7 +185,7 @@ local function choose_template()
         items[#items + 1] = { label = label, icon = config.icons.tasks, _name = t.name }
     end
     require("lvim-ui").select({
-        title = " Run template",
+        title = "Run template",
         items = items,
         callback = function(confirmed, index)
             if confirmed == true and items[index] then
@@ -217,7 +217,7 @@ local function choose_history()
         }
     end
     require("lvim-ui").select({
-        title = " Task history",
+        title = "Task history",
         items = items,
         callback = function(confirmed, index)
             local r = confirmed == true and items[index] and items[index]._row or nil

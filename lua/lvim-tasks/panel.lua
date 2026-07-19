@@ -140,7 +140,10 @@ local function task_row(task, namew)
     local name = "task_" .. task.id
     state.registry[name] = task
     local sfx = hl_suffix(task.status)
-    local label = (" %-" .. namew .. "s"):format(clip(task.spec.name or "?", namew))
+    -- Pad by DISPLAY WIDTH: `namew` is a strdisplaywidth column and `clip` counts chars, but `%-Ns` pads by
+    -- BYTES — so a non-ASCII name (Cyrillic label, a glyph) would misalign the group column of every row after.
+    local nm = clip(task.spec.name or "?", namew)
+    local label = " " .. nm .. string.rep(" ", math.max(0, namew - vim.fn.strdisplaywidth(nm)))
     local spans = { { 1, 1 + #label, "LvimTasks" .. sfx .. "Name" } }
     local group = task.spec.group or task.spec.template
     if group then
@@ -172,7 +175,6 @@ end
 --- every header rebuild, so the two must not share a letter.)
 ---@return table  a `type="bar"` row
 local function filter_bar()
-    local k = config.keys
     local buttons = {
         { id = "running", label = "Running" },
         { id = "failed", label = "Failed" },
@@ -305,6 +307,29 @@ local function bind_output_keys(buf)
             M.close()
         end, "lvim-tasks: close the panel")
     end
+end
+
+--- Remove the nav/close maps `bind_output_keys` put on a task's output buffer and clear its latch. Needed
+--- before the SAME buffer is adopted by lvim-term (the `t` key): otherwise our buffer-local `q`/`<Esc>` → tasks
+--- close (a `nowait` map that SWALLOWS the key) would fire inside the lvim-term dock instead of lvim-term's own.
+---@param buf integer
+local function unbind_output_keys(buf)
+    if not (buf and api.nvim_buf_is_valid(buf)) or not vim.b[buf].lvim_tasks_nav then
+        return
+    end
+    local lhs_list = { "q", "<Esc>" }
+    for _, id in ipairs({ "panel_toggle", "panel_prev", "panel_next", "sector_next", "sector_prev" }) do
+        local k = surface.key(id)
+        for _, x in ipairs(type(k) == "table" and k or { k }) do
+            if type(x) == "string" and x ~= "" then
+                lhs_list[#lhs_list + 1] = x
+            end
+        end
+    end
+    for _, lhs in ipairs(lhs_list) do
+        pcall(vim.keymap.del, "n", lhs, { buffer = buf })
+    end
+    vim.b[buf].lvim_tasks_nav = nil
 end
 
 --- Swap the focused task's terminal buffer into the preview window (live scrollback — it IS the
@@ -461,6 +486,8 @@ local function open_in_term(task)
         notify("lvim-term is not installed (it provides the interactive terminal)", vim.log.levels.WARN)
         return
     end
+    -- Strip OUR nav/close maps first so lvim-term owns the adopted buffer's keys (q/<Esc>/nav).
+    unbind_output_keys(task.bufnr)
     term.adopt({
         bufnr = task.bufnr,
         job_id = task.job_id,
@@ -484,6 +511,9 @@ local function wire_keys(buf)
     key(k.restart, function()
         local task = cur_task()
         if task then
+            -- A succeeded task may have a pending auto-dispose timer; cancel it so it can't fire against the
+            -- restarted (now running) task.
+            registry.cancel_dispose(task.id)
             runner.restart(task, require("lvim-tasks").on_task_exit)
             M.refresh()
         end

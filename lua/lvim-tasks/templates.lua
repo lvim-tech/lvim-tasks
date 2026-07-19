@@ -57,7 +57,13 @@ function M.applicable(ctx)
     ctx = ctx or M.context()
     local out = {}
     for _, t in pairs(registry) do
-        local ok = (type(t.condition) ~= "function") or (t.condition(ctx) == true)
+        -- `condition` is a USER hook (a template / lvim-build entry); a throw would break the whole chooser
+        -- AND `:LvimTasks run` completion, so pcall it like every other user hook in the plugin.
+        local ok = true
+        if type(t.condition) == "function" then
+            local pok, res = pcall(t.condition, ctx)
+            ok = pok and res == true
+        end
         if ok then
             out[#out + 1] = t
         end

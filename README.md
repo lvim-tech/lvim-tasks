@@ -93,7 +93,7 @@ require("lvim-tasks").setup({})
 | `x` | stop the task (SIGTERM → SIGKILL escalation) |
 | `d` | dispose the task (drop the row + its output) |
 | `e` | edit the command and run it as a NEW task |
-| `u` / `f` / `s` / `a` | filter: Running / Failed / Success / All (live counts) |
+| `<CR>` on a filter button | apply that filter — Running / Failed / Success / All (live counts). The filter bar is a sector: reach it with `<C-j>`/`<C-k>`, then `<CR>` (or click) a button |
 | `n` | new task (type a command) |
 | `c` | clear done (dispose every non-running task) |
 | `g?` | the keymap **cheatsheet** (also a `help` chip on the footer bar) |
@@ -195,7 +195,8 @@ require("lvim-tasks").setup({
         edit = "e",
         new = "n",
         clear_done = "c",
-        -- The status FILTER bar (`u` for Running: `r` is the row RESTART key).
+        -- The status filter bar has NO letter hotkeys: its buttons are activated by `<CR>` (or a click) on
+        -- the button, after reaching the bar sector with `<C-j>`/`<C-k>`.
     },
     -- Status accents: lvim-utils palette keys (track the live theme) or literal "#rrggbb".
     colors = {

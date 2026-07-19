@@ -17,6 +17,11 @@ local M = {}
 local db = nil
 local opened = false
 
+---@type table<string, integer|false>  memoized avg_duration per template (`false` = computed, no data). The
+--- panel rebuilds every 120ms spinner tick and each RUNNING templated row would otherwise run a SELECT over
+--- all that template's success rows — a value that only changes when a run FINISHES. Invalidated in M.record.
+local avg_cache = {}
+
 local SCHEMA = {
     id = { "integer", primary = true, autoincrement = true },
     template = { "text" },
@@ -75,6 +80,10 @@ function M.record(task)
         duration_ms = task:duration_ms(),
         started_at = task.started_epoch, -- wall-clock seconds (uv.now() is monotonic, not a date)
     })
+    -- a new finished run changes this template's average → drop the memoized value
+    if task.spec.template then
+        avg_cache[task.spec.template] = nil
+    end
 end
 
 --- Past runs, newest first (capped). Empty when disabled / unavailable.
@@ -97,18 +106,23 @@ function M.avg_duration(template)
     if not store or not template then
         return nil
     end
-    local rows = store:find("task_history", { template = template, status = "success" })
-    if type(rows) ~= "table" or #rows == 0 then
-        return nil
+    local cached = avg_cache[template]
+    if cached ~= nil then
+        return cached or nil -- `false` → computed, no data
     end
+    local rows = store:find("task_history", { template = template, status = "success" })
     local sum, n = 0, 0
-    for _, r in ipairs(rows) do
-        if r.duration_ms then
-            sum = sum + r.duration_ms
-            n = n + 1
+    if type(rows) == "table" then
+        for _, r in ipairs(rows) do
+            if r.duration_ms then
+                sum = sum + r.duration_ms
+                n = n + 1
+            end
         end
     end
-    return (n > 0) and math.floor(sum / n) or nil
+    local avg = (n > 0) and math.floor(sum / n) or nil
+    avg_cache[template] = avg or false
+    return avg
 end
 
 --- Whether durable history is active (enabled + backend available).

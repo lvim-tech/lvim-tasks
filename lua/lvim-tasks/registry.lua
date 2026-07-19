@@ -85,6 +85,12 @@ end
 function M.dispose(id)
     for i, t in ipairs(tasks) do
         if t.id == id then
+            -- NEVER dispose a running task: the succeeded-task auto-dispose timer can fire after the user
+            -- RESTARTED the task (panel `r`), and disposing it deletes the live terminal buffer out from under
+            -- the job. The panel's `d` and clear_done already guard this; the timer path did not.
+            if t:is_running() then
+                return false
+            end
             if dispose_timers[id] then
                 pcall(function()
                     dispose_timers[id]:stop()
@@ -121,6 +127,19 @@ function M.clear_done()
         end
     end
     return n
+end
+
+--- Cancel a pending succeeded-task auto-dispose timer (e.g. the task was RESTARTED before it fired), so the
+--- timer never runs against the now-running task and its handle is released.
+---@param id integer
+function M.cancel_dispose(id)
+    if dispose_timers[id] then
+        pcall(function()
+            dispose_timers[id]:stop()
+            dispose_timers[id]:close()
+        end)
+        dispose_timers[id] = nil
+    end
 end
 
 --- Apply the dispose policy for a task that just ended: schedule a succeeded task's auto-dispose.

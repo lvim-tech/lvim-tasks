@@ -107,7 +107,9 @@ tasks RUNS them.
   x               stop the task (SIGTERM → SIGKILL escalation)
   d               dispose the task (drop the row + its output)
   e               edit the command, run it as a NEW task
-  u / f / s / a   filter: Running / Failed / Success / All (live counts)
+  <CR> on a       apply that filter — Running / Failed / Success / All (live
+  filter button   counts). The bar is a sector: reach it with <C-j>/<C-k>,
+                  then <CR> (or click) a button (no letter hotkeys)
   n               new task (type a command)
   c               clear done
   g?              the keymap CHEATSHEET (also a `help` chip on the footer)

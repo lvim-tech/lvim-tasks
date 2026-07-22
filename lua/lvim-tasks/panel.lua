@@ -148,7 +148,9 @@ local function task_row(task, namew)
     local group = task.spec.group or task.spec.template
     if group then
         local cell = clip(group, 14)
-        local start = #label + 3
+        -- The cell sits right after the 2-space gap, so its FIRST byte is `#label + 2` (0-based into
+        -- the label). Starting the span at +3 left the group's first character uncoloured.
+        local start = #label + 2
         label = label .. "  " .. cell
         spans[#spans + 1] = { start, start + #cell, "LvimTasksGroup" }
     end
@@ -782,6 +784,14 @@ end
 --- Open the task panel.
 ---@param layout string?  per-open layout override ("float" | "area" | "bottom"; session-sticky)
 function M.open(layout)
+    -- Idempotent while VISIBLE: a plain reveal of an already-open panel would churn the dock (park →
+    -- rebuild the consumer), and that path calls stop_spinner WITHOUT a matching restart — so a run
+    -- launched while the panel is up (e.g. firing several tests from the summary) froze the spinner
+    -- until the next status change. A PARKED panel (is_open false) still re-reveals; an explicit
+    -- layout override still re-opens in that layout.
+    if M.is_open() and not layout then
+        return
+    end
     local target = layout or state.layout or config.layout
     if not ok_dock then
         open_frame(layout) -- no dock manager: standalone, geometry still central

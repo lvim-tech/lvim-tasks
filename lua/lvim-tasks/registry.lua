@@ -147,18 +147,27 @@ end
 ---@param task LvimTask
 function M.on_ended(task)
     local after = config.dispose_succeeded_after
-    if task.status == "success" and type(after) == "number" and after > 0 then
-        local timer = (vim.uv or vim.loop).new_timer()
-        if timer then
-            dispose_timers[task.id] = timer
-            timer:start(
-                after * 1000,
-                0,
-                vim.schedule_wrap(function()
-                    M.dispose(task.id)
-                end)
-            )
-        end
+    local transient = task.spec.transient == true
+    -- A transient task auto-disposes on ANY terminal status (a watch re-run should not linger);
+    -- a normal task only when it SUCCEEDED and a dispose delay is configured.
+    local delay = after
+    if transient and (type(delay) ~= "number" or delay <= 0) then
+        delay = 10 -- a sensible default when the user disabled success-dispose
+    end
+    local should = transient or (task.status == "success" and type(after) == "number" and after > 0)
+    if not should or type(delay) ~= "number" or delay <= 0 then
+        return
+    end
+    local timer = (vim.uv or vim.loop).new_timer()
+    if timer then
+        dispose_timers[task.id] = timer
+        timer:start(
+            delay * 1000,
+            0,
+            vim.schedule_wrap(function()
+                M.dispose(task.id)
+            end)
+        )
     end
 end
 

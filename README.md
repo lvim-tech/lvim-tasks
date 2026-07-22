@@ -6,7 +6,7 @@ them in a status panel, restart / stop / dispose them, register reusable **templ
 project's **`.vscode/tasks.json`**, and (opt-in) keep a durable **run history** in SQLite. It is
 the execution backend of **lvim-build** and a generic "run this and show me" API for any plugin.
 
-- **Tasks** — one spec (`name`, `cmd` argv-or-string, `cwd`, `env`, `matcher`, `group`, `hooks`)
+- **Tasks** — one spec (`name`, `cmd` argv-or-string, `cwd`, `env`, `matcher`, `group`, `transient`, `hooks`)
   becomes one job streaming into its OWN terminal buffer (scrollback = the output history). The
   lifecycle is `pending → running → success | failed | canceled`; every transition fires the
   `User LvimTasksChanged` autocmd and the spec's `hooks.on_start/on_output/on_exit`.

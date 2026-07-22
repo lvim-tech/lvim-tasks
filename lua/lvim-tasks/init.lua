@@ -127,6 +127,31 @@ function M.stop(id)
     return runner.stop(task)
 end
 
+--- Mark a RUNNING task complete from the OUTSIDE — the caller knows the work has logically finished
+--- even though the OS process has not exited yet. This is the seam for a job whose command emits an
+--- explicit completion signal but whose child processes LINGER, holding the pty open so the job's
+--- own exit never arrives (e.g. `flutter test --machine` prints its `done` event, then its
+--- flutter_tester children outlive it). Claims job ownership so the eventual real exit callback
+--- no-ops, reaps the process GROUP (killing the lingering children), flips the status, and runs the
+--- normal end-of-life glue (dispose policy + durable history).
+---@param id integer
+---@param success boolean
+---@return boolean
+function M.complete(id, success)
+    local task = registry.get(id)
+    if not task or not task:is_running() then
+        return false
+    end
+    local job = task.job_id
+    task.job_id = nil -- claim ownership: the runner's later on_exit for `job` sees the mismatch and no-ops
+    if job then
+        pcall(vim.fn.jobstop, job) -- reap the process group — the lingering child test-runner included
+    end
+    task:set_status(success and "success" or "failed", success and 0 or 1)
+    M.on_task_exit(task) -- dispose policy + history, exactly as a natural exit would have run
+    return true
+end
+
 --- Re-run the last spec run in this project (`:LvimTasks redo`).
 ---@return LvimTask?
 function M.redo()

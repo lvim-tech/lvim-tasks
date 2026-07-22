@@ -134,6 +134,9 @@ run({spec})                                           *lvim-tasks.run()*
       matcher = "gcc",              -- builtin name or literal errorformat
       group = "Build",              -- display group
       template = "make docs",       -- history grouping key (set by templates)
+      transient = false,            -- true: a throwaway run (e.g. a watch re-run) — kept out
+                                    -- of the durable history and auto-disposed on ANY terminal
+                                    -- status, so a frequently re-triggered task never piles up
       hooks = {
           on_start = function(task) end,
           on_output = function(task, lines) end,

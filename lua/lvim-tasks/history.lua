@@ -62,9 +62,13 @@ local function ensure()
     return db
 end
 
---- Record a finished task (one insert). No-op while disabled / unavailable.
+--- Record a finished task (one insert). No-op while disabled / unavailable, or for a `transient`
+--- task (a throwaway watch re-run must not accumulate in the durable history).
 ---@param task LvimTask
 function M.record(task)
+    if task.spec.transient then
+        return
+    end
     local store = ensure()
     if not store then
         return

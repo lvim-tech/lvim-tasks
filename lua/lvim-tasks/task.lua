@@ -26,6 +26,9 @@ local _next_id = 0
 ---@field template string?       The template that produced it (for history grouping)
 ---@field matcher  string?       Problem-matcher name / errorformat key (see matchers.lua)
 ---@field group    string?       Display group (Build/Run/Test/…)
+---@field transient boolean?     A throwaway run (e.g. a watch re-run): kept OUT of the durable
+---                              history and auto-disposed on ANY terminal status (not only success),
+---                              so a frequently re-triggered task does not pollute the panel/history.
 ---@field hooks    LvimTaskHooks?  Caller lifecycle callbacks (fired by the runner)
 
 ---@class LvimTaskHooks

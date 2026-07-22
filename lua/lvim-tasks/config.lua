@@ -33,9 +33,9 @@
 
 ---@type LvimTasksConfig
 return {
-    -- Where the task panel opens. Resolved per-command → this → (bottom is the sensible default
-    -- for a task list you watch while working).
-    layout = "bottom",
+    -- Where the task panel opens. Resolved per-command → this → ("area" docks in the cmdline/msgarea
+    -- zone, keeping the task list visible while you work).
+    layout = "area",
     -- Panel border/overlay title (the chassis places it per layout) and its alignment.
     title = "Tasks",
     title_pos = "left",

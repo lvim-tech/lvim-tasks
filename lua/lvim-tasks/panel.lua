@@ -712,12 +712,15 @@ local function open_frame(layout)
             state.tabs = nil
             state.preview_pan = nil
             state.registry = {}
-            -- A close the USER drove (q / Esc) must tell the dock, so it can reveal the LIFO-next parked
-            -- consumer. A PARK (dock-driven hide) or an internal rebuild must not — hence the guard.
+            -- A close the USER drove (q / Esc) tells the dock. `dock.closed` returns whether the entry
+            -- was PARKED (kept, keep_closed) or dropped — keep our key only when parked, so the panel is
+            -- re-summonable and a later close still notifies the dock. A dock-driven PARK / rebuild must
+            -- not report (state.parking guard).
             if ok_dock and state.dock_key and not state.parking then
-                local key = state.dock_key
-                state.dock_key = nil
-                pcall(dock.closed, key)
+                local ok, kept = pcall(dock.closed, state.dock_key)
+                if not (ok and kept) then
+                    state.dock_key = nil
+                end
             end
         end,
     })

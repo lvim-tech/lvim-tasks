@@ -257,8 +257,9 @@ end
 
 --- Open the task panel.
 ---@param layout string?  "float" | "area" | "bottom" (session-sticky override)
-function M.open(layout)
-    panel.open(layout)
+---@param opts? { focus?: boolean }  focus = false → reveal it, but leave the cursor where it is
+function M.open(layout, opts)
+    panel.open(layout, opts)
 end
 
 --- Toggle the task panel.

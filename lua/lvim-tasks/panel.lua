@@ -11,7 +11,7 @@
 ---@module "lvim-tasks.panel"
 
 local api = vim.api
-local uv = vim.uv or vim.loop
+local uv = vim.uv
 local config = require("lvim-tasks.config")
 local registry = require("lvim-tasks.registry")
 local runner = require("lvim-tasks.runner")
@@ -786,7 +786,8 @@ end
 
 --- Open the task panel.
 ---@param layout string?  per-open layout override ("float" | "area" | "bottom"; session-sticky)
-function M.open(layout)
+---@param opts? { focus?: boolean }  focus = false → reveal without taking the cursor
+function M.open(layout, opts)
     -- Idempotent while VISIBLE: a plain reveal of an already-open panel would churn the dock (park →
     -- rebuild the consumer), and that path calls stop_spinner WITHOUT a matching restart — so a run
     -- launched while the panel is up (e.g. firing several tests from the summary) froze the spinner
@@ -802,7 +803,9 @@ function M.open(layout)
     end
     -- Through the dock: opening in a layout that already holds a terminal / shell / picker PARKS that
     -- occupant rather than overlapping it, and our `show` builds the frame.
-    state.dock_key = dock.open(consumer(target))
+    -- `opts.focus == false` reveals the panel WITHOUT taking the cursor — for a run started somewhere
+    -- else (the lvim-test summary tree), where the output should appear but the cursor must stay put.
+    state.dock_key = dock.open(consumer(target), opts and { focus = opts.focus } or nil)
 end
 
 --- Close the panel (a no-op when it is not open).

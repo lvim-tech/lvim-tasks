@@ -158,7 +158,7 @@ function M.on_ended(task)
     if not should or type(delay) ~= "number" or delay <= 0 then
         return
     end
-    local timer = (vim.uv or vim.loop).new_timer()
+    local timer = vim.uv.new_timer()
     if timer then
         dispose_timers[task.id] = timer
         timer:start(

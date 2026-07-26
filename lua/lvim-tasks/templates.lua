@@ -46,7 +46,7 @@ function M.context()
     return {
         file = file,
         ft = vim.bo.filetype,
-        cwd = vim.uv and vim.uv.cwd() or vim.loop.cwd(),
+        cwd = vim.uv.cwd(),
     }
 end
 

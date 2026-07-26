@@ -195,7 +195,7 @@ function M.ensure()
     local _, path = find()
     local mtime = nil
     if path then
-        local st = (vim.uv or vim.loop).fs_stat(path)
+        local st = vim.uv.fs_stat(path)
         mtime = st and st.mtime.sec or nil
     end
     if path == scanned_path and mtime == scanned_mtime then

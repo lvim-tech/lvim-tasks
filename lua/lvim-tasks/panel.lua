@@ -708,6 +708,18 @@ local function open_frame(layout)
         end,
         callback = function()
             stop_spinner()
+            -- The output-buffer nav maps live and die WITH THE PANEL. They resolve the frame from the live
+            -- handle, so once it is gone every one of them is a `nowait` map that SWALLOWS its key and does
+            -- nothing — and a task's output buffer outlives the panel (`bufhidden = hide`, kept until the
+            -- task is disposed). Left on, a task buffer opened on its own (`:buffer`, a split, lvim-term)
+            -- looks like an ordinary buffer while `q`, `<Esc>`, `<Tab>` and the whole `<C-hjkl>` set are
+            -- silently dead — no way out except a command. So they come off with the panel that owns them;
+            -- a later open re-binds them through `render_preview`.
+            for _, task in ipairs(registry.all()) do
+                if task.bufnr then
+                    unbind_output_keys(task.bufnr)
+                end
+            end
             state.handle = nil
             state.tabs = nil
             state.preview_pan = nil

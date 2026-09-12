@@ -32,7 +32,7 @@ errorformat directory stack), not the editor's.
 
 On exit, a task with a `matcher` has its output parsed with 'errorformat'
 and the resulting locations pushed to the quickfix list (styled by
-lvim-qf-loc when installed). Requires Neovim >= 0.11.
+lvim-qf-loc when installed). Requires Neovim >= 0.12.
 
 lvim-tasks is the execution backend of lvim-build: build DETECTS actions,
 tasks RUNS them.

@@ -34,7 +34,7 @@ the execution backend of **lvim-build** and a generic "run this and show me" API
 
 ## Requirements
 
-- Neovim >= 0.11 (`jobstart(…, { term = true })`)
+- Neovim >= 0.12 (`jobstart(…, { term = true })`)
 - [lvim-utils](https://github.com/lvim-tech/lvim-utils) (palette / merge / store)
 - [lvim-ui](https://github.com/lvim-tech/lvim-ui) (the panel + choosers)
 - Optional: [sqlite.lua](https://github.com/kkharji/sqlite.lua) for `persist_history`,

@@ -58,7 +58,7 @@ return {
     -- Register templates parsed from a project's .vscode/tasks.json (shell/process tasks).
     vscode_tasks = true,
     -- Spinner frames animated on a running task's status cell (single-width braille).
-    spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
+    spinner = { "\u{f0a9e}", "\u{f0a9f}", "\u{f0aa0}", "\u{f0aa1}", "\u{f0aa2}", "\u{f0aa3}", "\u{f0aa4}", "\u{f0aa5}" },
     -- Status glyphs (single-width Nerd Font).
     icons = {
         tasks = "󰑮", -- the panel / hud chip lead glyph

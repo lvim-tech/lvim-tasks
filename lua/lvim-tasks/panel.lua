@@ -634,7 +634,7 @@ local function build_footer()
                 M.refresh()
             end,
         },
-        { type = "separator", text = "●", style = { padding = { 1, 1 }, hl = "LvimUiFooterSep" } },
+        { type = "separator", text = "\u{f09de}", style = { padding = { 1, 1 }, hl = "LvimUiFooterSep" } },
         {
             -- The row keys are not discoverable from the list, so the bar has to say where they are written
             -- down. A DISPLAY chip: the real `g?` is a frame-wide keymap (see open_frame), which is what makes

@@ -174,7 +174,7 @@ require("lvim-tasks").setup({
     -- Register templates parsed from a project's .vscode/tasks.json (shell/process tasks).
     vscode_tasks = true,
     -- Spinner frames animated on a running task's status cell (single-width braille).
-    spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
+    spinner = { "󰪞", "󰪟", "󰪠", "󰪡", "󰪢", "󰪣", "󰪤", "󰪥" },
     -- Status glyphs (single-width Nerd Font).
     icons = {
         tasks = "󰑮", -- the panel / hud chip lead glyph

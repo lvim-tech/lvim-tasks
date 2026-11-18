@@ -51,7 +51,7 @@ tasks RUNS them.
       qf = true,                     -- matcher results -> quickfix
       hud_chip = true,               -- "N tasks" statusline chip while running
       vscode_tasks = true,           -- ingest .vscode/tasks.json templates
-      spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
+      spinner = { "󰪞", "󰪟", "󰪠", "󰪡", "󰪢", "󰪣", "󰪤", "󰪥" },
       icons = {
           tasks = "󰑮",
           pending = "󰔟",

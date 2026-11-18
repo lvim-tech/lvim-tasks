@@ -189,7 +189,7 @@ local function ensure_vscode()
 end
 
 --- The template chooser (`:LvimTasks run` with no name): applicable templates in `ui.select`,
---- labelled "group ➤ name — desc".
+--- labelled "group 󰅂 name — desc".
 local function choose_template()
     ensure_vscode()
     local ctx = templates.context()
@@ -202,7 +202,7 @@ local function choose_template()
     for _, t in ipairs(list) do
         local label = t.name
         if t.group then
-            label = t.group .. " ➤ " .. label
+            label = t.group .. " 󰅂 " .. label
         end
         if t.desc then
             label = label .. " — " .. t.desc
